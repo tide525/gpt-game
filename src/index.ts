@@ -1,23 +1,52 @@
 import * as Phaser from "phaser";
 
-const RADIUS = 16;
+const MAX_RADIUS = 120;
+const IMAGE_RADIUS = 160;
+
 const FRICTION = 0.01;
 const BOUNCE = 0.1;
 
 const DROPPING_SECONDS = 1;
 const INIT_BALL_Y = 40;
-const MAX_COLOR = 4;
+
+// GPT族のパラメータ数
+// 後半は噂でしかないから適当
+const PARAMS = [0.117, 1.5, 175, 355, 1000];
+
+const TEXTURES = ["ball1", "ball2", "ball3", "ball4", "ball5"];
+
+function expWeightedRandom(n: number) {
+  const weights = [];
+  for (let i = 0; i < n; i++) {
+    const weight = Math.pow(2, -i);
+    weights.push(weight);
+  }
+  const sumWeights = weights.reduce((acc, weight) => acc + weight, 0);
+
+  const r = Math.random() * sumWeights;
+
+  let cumWeights = 0;
+  for (let i = 0; i < n; i++) {
+    cumWeights += weights[i];
+    if (r <= cumWeights) {
+      return i;
+    }
+  }
+}
 
 export default class Game extends Phaser.Scene {
   nextBall: Phaser.GameObjects.Image = null;
   isDropping: boolean = false;
+  maxColor: number = 0;
 
   constructor() {
     super("game");
   }
 
   preload() {
-    this.load.image("ball", "assets/sprites/pangball.png");
+    for (const texture of TEXTURES) {
+      this.load.image(texture, `assets/sprites/${texture}.png`);
+    }
   }
 
   create() {
@@ -53,11 +82,16 @@ export default class Game extends Phaser.Scene {
           this.matter.world.remove([ballA, ballB]);
 
           // 結合したボールを追加
-          if (colorA === MAX_COLOR) {
+          if (colorA === PARAMS.length) {
             return;
           }
 
-          const ball = this.createBall(centerX, centerY, colorA + 1);
+          const newColor = colorA + 1;
+          const ball = this.createBall(centerX, centerY, newColor);
+
+          if (newColor > this.maxColor) {
+            this.maxColor = newColor;
+          }
         }
       },
       this
@@ -72,77 +106,48 @@ export default class Game extends Phaser.Scene {
     }
   }
 
+  calcScales() {
+    // スイカは球だし、球を想定して三乗根をかけてみる
+    const cbrtParams = PARAMS.map((param, index) => Math.cbrt(param));
+
+    // [0,1]に収める
+    const maxCbrtParam = Math.max(...cbrtParams);
+    const normCbrtParams = cbrtParams.map(
+      (cbrtParam, index) => cbrtParam / maxCbrtParam
+    );
+
+    const scales = normCbrtParams.map(
+      (normCbrtParam, index) => normCbrtParam * (MAX_RADIUS / IMAGE_RADIUS)
+    );
+
+    return scales;
+  }
+
   createNextBall() {
-    const nextBallColor = Phaser.Math.Between(0, 2);
+    const nextBallColor = expWeightedRandom(Math.max(this.maxColor, 1));
 
-    let tint;
-    let scale;
-
-    switch (nextBallColor) {
-      case 0:
-        tint = 0xff0000;
-        scale = 1;
-        break;
-      case 1:
-        tint = 0xffff00;
-        scale = 2;
-        break;
-      case 2:
-        tint = 0x00ff00;
-        scale = 3;
-        break;
-      case 3:
-        tint = 0x00ffff;
-        scale = 4;
-        break;
-      case 4:
-        tint = 0x0000ff;
-        scale = 5;
-        break;
-    }
+    const texture = TEXTURES[nextBallColor];
+    const scale = this.calcScales()[nextBallColor];
 
     this.nextBall = this.add
-      .image(160, INIT_BALL_Y, "ball")
+      .image(160, INIT_BALL_Y, texture)
+
       .setData("color", nextBallColor)
-      .setTint(tint)
       .setScale(scale);
   }
 
   createBall(x: number, y: number, color: number) {
-    let tint;
-    let scale;
-
-    switch (color) {
-      case 0:
-        tint = 0xff0000;
-        scale = 1;
-        break;
-      case 1:
-        tint = 0xffff00;
-        scale = 2;
-        break;
-      case 2:
-        tint = 0x00ff00;
-        scale = 3;
-        break;
-      case 3:
-        tint = 0x00ffff;
-        scale = 4;
-        break;
-      case 4:
-        tint = 0x0000ff;
-        scale = 5;
-        break;
-    }
+    const texture = TEXTURES[color];
+    const scale = this.calcScales()[color];
 
     const ball = this.matter.add
-      .image(x, y, "ball")
-      .setCircle(RADIUS)
+      .image(x, y, texture)
+
+      .setCircle(IMAGE_RADIUS)
       .setFriction(FRICTION)
       .setBounce(BOUNCE)
 
       .setData("color", color)
-      .setTint(tint)
       .setScale(scale);
 
     return ball;
