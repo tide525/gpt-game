@@ -1,5 +1,8 @@
 import * as Phaser from "phaser";
 
+const WIDTH = 360;
+const HEIGHT = 640;
+
 const MAX_RADIUS = 120;
 const IMAGE_RADIUS = 160;
 
@@ -7,7 +10,9 @@ const FRICTION = 0.01;
 const BOUNCE = 0.1;
 
 const DROPPING_SECONDS = 1;
-const INIT_BALL_Y = 40;
+const INIT_BALL_Y = 80;
+
+const UPPER_BOUND = 100;
 
 // GPT族のパラメータ数
 // 後半は噂でしかないから適当
@@ -39,6 +44,8 @@ export default class Game extends Phaser.Scene {
   isDropping: boolean = false;
   maxColor: number = 0;
 
+  currentBalls: Phaser.Physics.Matter.Image[];
+
   constructor() {
     super("game");
   }
@@ -50,7 +57,20 @@ export default class Game extends Phaser.Scene {
   }
 
   create() {
-    this.matter.world.setBounds(0, 0, 360, 640, 32, true, true, false, true);
+    this.matter.world.setBounds(
+      0,
+      0,
+      WIDTH,
+      HEIGHT,
+      32,
+      true,
+      true,
+      false,
+      true
+    );
+
+    this.add.line(WIDTH / 2, UPPER_BOUND, 0, 0, WIDTH, 0, 0x2b5283);
+    this.currentBalls = [];
 
     // 最初のボール
     this.createNextBall();
@@ -150,6 +170,8 @@ export default class Game extends Phaser.Scene {
       .setData("color", color)
       .setScale(scale);
 
+    this.currentBalls.push(ball);
+
     return ball;
   }
 
@@ -173,20 +195,38 @@ export default class Game extends Phaser.Scene {
 
     this.time.addEvent({
       delay: DROPPING_SECONDS * 1000,
-      callback: function () {
-        this.isDropping = false;
-        this.createNextBall();
-      },
+      callback: this.dropCallback,
       callbackScope: this,
     });
+  }
+
+  dropCallback() {
+    // ゲームオーバーを確認
+    for (const ball of this.currentBalls) {
+      if (ball.y < UPPER_BOUND) {
+        this.add
+          .text(WIDTH / 2, HEIGHT / 2, "ゲームオーバー")
+          .setFontSize(48)
+          .setFontStyle("bold")
+          .setColor("#2b5283")
+          .setOrigin(0.5, 0.5);
+        this.input.off("pointerdown", this.handlePointerdown, this);
+        return;
+      }
+    }
+
+    // クリック制限解除
+    this.isDropping = false;
+
+    this.createNextBall();
   }
 }
 
 const config = {
   type: Phaser.AUTO,
   backgroundColor: "#eeeeee",
-  width: 360,
-  height: 640,
+  width: WIDTH,
+  height: HEIGHT,
   physics: {
     default: "matter",
     matter: {
