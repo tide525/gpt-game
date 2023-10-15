@@ -1,43 +1,126 @@
 import * as Phaser from "phaser";
 
-export default class Demo extends Phaser.Scene {
+const RADIUS = 16;
+const FRICTION = 0.01;
+const BOUNCE = 0.1;
+
+const INIT_BALL_Y = 40;
+
+const MAX_COLOR = 4;
+
+export default class Game extends Phaser.Scene {
   constructor() {
-    super("demo");
+    super("game");
   }
 
   preload() {
-    this.load.image("logo", "assets/phaser3-logo.png");
-    this.load.image("libs", "assets/libs.png");
-    this.load.glsl("bundle", "assets/plasma-bundle.glsl.js");
-    this.load.glsl("stars", "assets/starfields.glsl.js");
+    this.load.image("ball", "assets/sprites/pangball.png");
   }
 
   create() {
-    this.add.shader("RGB Shift Field", 0, 0, 800, 600).setOrigin(0);
+    this.matter.world.setBounds(0, 0, 360, 640, 32, true, true, false, true);
 
-    this.add.shader("Plasma", 0, 412, 800, 172).setOrigin(0);
+    this.input.on(
+      "pointerdown",
+      function (pointer: any) {
+        const color = Phaser.Math.Between(0, 2);
 
-    this.add.image(400, 300, "libs");
+        // xだけ追従
+        const ball = this.createBall(pointer.x, INIT_BALL_Y, color);
+      },
+      this
+    );
 
-    const logo = this.add.image(400, 70, "logo");
+    this.matter.world.on(
+      "collisionstart",
+      (event: any, bodyA: MatterJS.BodyType, bodyB: MatterJS.BodyType) => {
+        // 壁との衝突は無視
+        if (bodyA.gameObject === null || bodyB.gameObject === null) {
+          return;
+        }
 
-    this.tweens.add({
-      targets: logo,
-      y: 350,
-      duration: 1500,
-      ease: "Sine.inOut",
-      yoyo: true,
-      repeat: -1,
-    });
+        // ボール同士
+        const ballA: Phaser.Physics.Matter.Image = bodyA.gameObject;
+        const ballB: Phaser.Physics.Matter.Image = bodyB.gameObject;
+
+        const colorA: number = ballA.getData("color");
+        const colorB: number = ballB.getData("color");
+        if (colorA === colorB) {
+          const centerX = (ballA.x + ballB.x) / 2;
+          const centerY = (ballA.y + ballB.y) / 2;
+
+          // 既存のボールを削除
+          ballA.setVisible(false);
+          ballB.setVisible(false);
+          this.matter.world.remove([ballA, ballB]);
+
+          // 結合したボールを追加
+          if (colorA === MAX_COLOR) return;
+
+          const ball = this.createBall(centerX, centerY, colorA + 1);
+        }
+      },
+      this
+    );
+  }
+
+  update() {
+    const pointer = this.input.activePointer;
+  }
+
+  createBall(x: number, y: number, color: number) {
+    let tint;
+    let scale;
+
+    switch (color) {
+      case 0:
+        tint = 0xff0000;
+        scale = 1;
+        break;
+      case 1:
+        tint = 0xffff00;
+        scale = 2;
+        break;
+      case 2:
+        tint = 0x00ff00;
+        scale = 3;
+        break;
+      case 3:
+        tint = 0x00ffff;
+        scale = 4;
+        break;
+      case 4:
+        tint = 0x0000ff;
+        scale = 5;
+        break;
+    }
+
+    const ball = this.matter.add
+      .image(x, y, "ball")
+      .setCircle(RADIUS)
+      .setFriction(FRICTION)
+      .setBounce(BOUNCE)
+
+      .setData("color", color)
+      .setTint(tint)
+      .setScale(scale);
+
+    return ball;
   }
 }
 
 const config = {
   type: Phaser.AUTO,
-  backgroundColor: "#125555",
-  width: 800,
-  height: 600,
-  scene: Demo,
+  backgroundColor: "#eeeeee",
+  width: 360,
+  height: 640,
+  physics: {
+    default: "matter",
+    matter: {
+      enableSleeping: true,
+    },
+  },
+  scene: Game,
 };
 
 const game = new Phaser.Game(config);
