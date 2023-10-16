@@ -18,7 +18,7 @@ const UPPER_BOUND = 100;
 // 後半は噂でしかないから適当
 const PARAMS = [0.117, 1.5, 175, 355, 1000];
 
-const TEXTURES = ["ball1", "ball2", "ball3", "ball4", "ball5"];
+const TEXTURES = ["gpt", "gpt2", "gpt3", "gpt3_5", "gpt4"];
 
 function expWeightedRandom(n: number) {
   const weights = [];
@@ -46,6 +46,9 @@ export default class Game extends Phaser.Scene {
 
   currentBalls: Phaser.Physics.Matter.Image[];
 
+  score: number = 0;
+  scoreText: Phaser.GameObjects.Text;
+
   constructor() {
     super("game");
   }
@@ -69,7 +72,28 @@ export default class Game extends Phaser.Scene {
       true
     );
 
-    this.add.line(WIDTH / 2, UPPER_BOUND, 0, 0, WIDTH, 0, 0x2b5283);
+    this.add.rectangle(
+      WIDTH / 2,
+      UPPER_BOUND / 2,
+      WIDTH,
+      UPPER_BOUND,
+      0x202123
+    );
+    this.add.rectangle(
+      WIDTH / 2,
+      (HEIGHT - UPPER_BOUND) / 2 + UPPER_BOUND,
+      WIDTH,
+      HEIGHT - UPPER_BOUND,
+      0xf7f7f8
+    );
+
+    // スコア表示
+    this.add.text(20, 20, "スコア").setColor("#ececf1");
+    this.scoreText = this.add
+      .text(WIDTH - 20, 20, `${this.score}パラメータ`)
+      .setColor("#ececf1")
+      .setOrigin(1, 0);
+
     this.currentBalls = [];
 
     // 最初のボール
@@ -92,26 +116,30 @@ export default class Game extends Phaser.Scene {
 
         const colorA: number = ballA.getData("color");
         const colorB: number = ballB.getData("color");
-        if (colorA === colorB) {
-          const centerX = (ballA.x + ballB.x) / 2;
-          const centerY = (ballA.y + ballB.y) / 2;
+        if (colorA !== colorB) {
+          return;
+        }
 
-          // 既存のボールを削除
-          ballA.setVisible(false);
-          ballB.setVisible(false);
-          this.matter.world.remove([ballA, ballB]);
+        const centerX = (ballA.x + ballB.x) / 2;
+        const centerY = (ballA.y + ballB.y) / 2;
 
-          // 結合したボールを追加
-          if (colorA === PARAMS.length) {
-            return;
-          }
+        // 既存のボールを削除
+        ballA.setVisible(false);
+        ballB.setVisible(false);
+        this.matter.world.remove([ballA, ballB]);
 
-          const newColor = colorA + 1;
-          const ball = this.createBall(centerX, centerY, newColor);
+        this.score += PARAMS[colorA] * 1000000000;
 
-          if (newColor > this.maxColor) {
-            this.maxColor = newColor;
-          }
+        // 結合したボールを追加
+        if (colorA === PARAMS.length) {
+          return;
+        }
+
+        const newColor = colorA + 1;
+        const ball = this.createBall(centerX, centerY, newColor);
+
+        if (newColor > this.maxColor) {
+          this.maxColor = newColor;
         }
       },
       this
@@ -124,6 +152,8 @@ export default class Game extends Phaser.Scene {
     if (this.nextBall !== null) {
       this.nextBall.setPosition(pointer.x, INIT_BALL_Y);
     }
+
+    this.scoreText.setText(`${this.score}パラメータ`);
   }
 
   calcScales() {
@@ -204,13 +234,49 @@ export default class Game extends Phaser.Scene {
     // ゲームオーバーを確認
     for (const ball of this.currentBalls) {
       if (ball.y < UPPER_BOUND) {
+        this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0xffffff, 0.8);
+
         this.add
           .text(WIDTH / 2, HEIGHT / 2, "ゲームオーバー")
+          .setColor("#111827")
           .setFontSize(48)
           .setFontStyle("bold")
-          .setColor("#2b5283")
           .setOrigin(0.5, 0.5);
         this.input.off("pointerdown", this.handlePointerdown, this);
+
+        this.add
+          .text(WIDTH / 2, HEIGHT / 2 + 60, `${this.score}パラメータ`)
+          .setFontSize(24)
+          .setFontStyle("bold")
+          .setColor("#111827")
+          .setOrigin(0.5, 0.5);
+
+        this.add
+          .text(WIDTH / 2, HEIGHT / 2 + 100, "結果をXで共有")
+          .setColor("#111827")
+          .setFontSize(24)
+          .setFontStyle("bold")
+          .setOrigin(0.5, 0.5)
+          .setInteractive()
+          .on(
+            "pointerdown",
+            function () {
+              window.open(
+                `https://twitter.com/intent/tweet?text=${this.score}パラメータをメモリに載せられたよ&url=https://tide525.github.io/gpt-game/&hashtags=GPTゲーム`,
+                "_blank",
+                "noopener,noreferrer"
+              );
+            },
+            this
+          );
+
+        this.add
+          .text(WIDTH / 2, HEIGHT / 2 + 200, "リロードでリトライ")
+          .setFontSize(24)
+          .setFontStyle("bold")
+          .setColor("#111827")
+          .setOrigin(0.5, 0.5);
+
         return;
       }
     }
@@ -224,7 +290,7 @@ export default class Game extends Phaser.Scene {
 
 const config = {
   type: Phaser.AUTO,
-  backgroundColor: "#eeeeee",
+  backgroundColor: "#ffffff",
   width: WIDTH,
   height: HEIGHT,
   physics: {
