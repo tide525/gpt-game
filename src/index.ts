@@ -44,6 +44,8 @@ export default class Game extends Phaser.Scene {
   scales: number[];
   nextBall: Phaser.GameObjects.Image;
 
+  openai: Phaser.GameObjects.Image;
+
   isDropping: boolean = false;
 
   currentBalls: Phaser.Physics.Matter.Image[] = [];
@@ -57,6 +59,8 @@ export default class Game extends Phaser.Scene {
   }
 
   preload() {
+    this.load.image("openai", "assets/sprites/openai.png");
+
     for (const texture of TEXTURES) {
       this.load.image(texture, `assets/sprites/${texture}.png`);
     }
@@ -102,7 +106,7 @@ export default class Game extends Phaser.Scene {
       .setColor("#ececf1")
       .setOrigin(1, 0);
     this.add
-      .text(SCORE_MARGIN, UPPER_BOUND_Y, "メモリここまで↓")
+      .text(SCORE_MARGIN, UPPER_BOUND_Y, "メモリ容量ここまで↓")
       .setColor("#ececf1")
       .setOrigin(0, 1);
 
@@ -128,8 +132,12 @@ export default class Game extends Phaser.Scene {
   }
 
   update() {
-    this.updateNextBall();
     this.scoreText.setText(`${this.score}パラメータ`);
+
+    const pointer = this.input.activePointer;
+    this.openai.setPosition(pointer.x, INIT_BALL_Y);
+
+    this.nextBall.setPosition(pointer.x, INIT_BALL_Y);
   }
 
   calcScales() {
@@ -187,6 +195,11 @@ export default class Game extends Phaser.Scene {
   }
 
   createNextBall() {
+    this.openai = this.add
+      .image(WIDTH / 2, INIT_BALL_Y, "openai")
+      .setDisplaySize(30, 30)
+      .setOrigin(0.2, 0.8);
+
     // 今ある最大よりも一回り小さいボール
     const nextBallLevel = expWeightedRandom(Math.max(this.maxLevel, 1));
 
@@ -195,13 +208,9 @@ export default class Game extends Phaser.Scene {
 
     this.nextBall = this.add
       .image(WIDTH / 2, INIT_BALL_Y, texture)
+      .setAngle(-30)
       .setScale(scale)
       .setData("level", nextBallLevel);
-  }
-
-  updateNextBall() {
-    const pointer = this.input.activePointer;
-    this.nextBall.setPosition(pointer.x, INIT_BALL_Y);
   }
 
   createBall(x: number, y: number, level: number) {
@@ -210,6 +219,7 @@ export default class Game extends Phaser.Scene {
 
     const ball = this.matter.add
       .image(x, y, texture)
+      .setAngle(-30)
       .setCircle(IMAGE_RADIUS)
       .setFriction(FRICTION)
       .setBounce(BOUNCE)
@@ -259,10 +269,17 @@ export default class Game extends Phaser.Scene {
     // クリック制限解除
     this.isDropping = false;
 
+    this.openai.setVisible(false);
     this.createNextBall();
   }
 
   handleOver() {
+    this.openai.setVisible(false);
+    this.add
+      .image(this.openai.x, INIT_BALL_Y, "openai")
+      .setDisplaySize(30, 30)
+      .setOrigin(0.2, 0.8);
+
     this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0xffffff, 0.8);
 
     this.add
@@ -292,7 +309,7 @@ export default class Game extends Phaser.Scene {
         "pointerup",
         function () {
           window.open(
-            `https://twitter.com/intent/tweet?text=${this.score}パラメータをメモリに載っけたよ&url=https://tide525.github.io/gpt-game/&hashtags=GPTゲーム`,
+            `https://twitter.com/intent/tweet?text=${this.score}パラメータ分のGPTをメモリに載っけたよ&url=https://tide525.github.io/gpt-game/&hashtags=GPTゲーム`,
             "_blank",
             "noopener,noreferrer"
           );
